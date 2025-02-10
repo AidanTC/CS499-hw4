@@ -75,8 +75,8 @@ def train(model, train_loader, val_loader):
 
   ################################
   # scheduler = nn.ExponentialLR(optimizer, gamma=config["lr_decay"])
-  linScheduler = nn.LinearLR(optimizer, start_factor=.25, end_factor=1.0, last_epoch=20)
-  cosScheduler = nn.CosineAnnealingLR(optimizer, T_max=20) #20? feels like it could be inf
+  linScheduler = LinearLR(optimizer, start_factor=0.25, end_factor=1.0, total_iters=20)
+  cosScheduler = CosineAnnealingLR(optimizer, T_max=20) #20? feels like it could be inf
 
   ################################
   
@@ -87,6 +87,7 @@ def train(model, train_loader, val_loader):
   # Main training loop with progress bar
   iteration = 0
   best_val = 0
+  print("training started")
   pbar = tqdm(total=config["max_epoch"]*len(train_loader), desc="Training Iterations", unit="batch")
   for epoch in range(config["max_epoch"]):
     model.train()

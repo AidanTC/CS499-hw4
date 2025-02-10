@@ -32,13 +32,13 @@ class ConvNextBlock(nn.Module):
   def __init__(self, d_in, layer_scale=1e-6, kernel_size=7, stochastic_depth_prob=1):
     super().__init__()
     # he initial layer scale (default 1e-6), and a stochastic depth probability of survival (default 1). 
-    layer_scale = .000001
-    depthwise_multiplier = 1
-    depth_survival = 1
+    # layer_scale = .000001
+    depthwise_multiplier = 1 #?
+    # depth_survival = 1
     
-    self.depth_conv = nn.Conv2d(d_in, d_in*depthwise_multiplier, kernel_size=kernel_size, groups=d_in)
+    self.depth_conv = nn.Conv2d(d_in, d_in*depthwise_multiplier, kernel_size=kernel_size, groups=d_in, padding=kernel_size // 2)
     self.layer_norm = nn.LayerNorm(d_in)
-    self.pointwise_conv = nn.Conv2d(in_channels= d_in, out_channels= d_in, kernel_size=1, bias=False )
+    self.pointwise_conv = nn.Conv2d(in_channels= d_in, out_channels= d_in, kernel_size=1 )#bias=False 
 
     # Layer scale parameter (initialized with layer_scale_init)
     self.layer_scale = nn.Parameter(layer_scale * torch.ones(d_in))
@@ -49,6 +49,7 @@ class ConvNextBlock(nn.Module):
   def forward(self,x):
   # Save the input for the residual connection
     identity = x
+    
 
     # Depthwise convolution
     x = self.depth_conv(x)
@@ -57,6 +58,7 @@ class ConvNextBlock(nn.Module):
     x = x.permute(0, 2, 3, 1)
     x = self.layer_norm(x)
     x = x.permute(0, 3, 1, 2)
+    # print("after permute", x.shape)
 
     # Pointwise convolution
     x = self.pointwise_conv(x)
@@ -64,18 +66,22 @@ class ConvNextBlock(nn.Module):
     # Layer scaling
     x = x * self.layer_scale[None, :, None, None]
 
-    # if self.training:
-    #   # Stochastic depth
-    #   if torch.rand(1) < self.stochastic_depth_prob:
-    #     x = x / self.stochastic_depth_prob
-    #   else:
-    #     x = torch.zeros
+    if self.training:
+      # Stochastic depth
+      mask = torch.rand(x.shape[0], 1, 1, 1, device=x.device) < self.stochastic_depth_prob
+      x = x * mask / self.stochastic_depth_prob
+      # if torch.rand(1) < self.stochastic_depth_prob:
+      #   x = x / self.stochastic_depth_prob
+      # else:
+      #   x = torch.zeros
 
     # Stochastic depth
-    if self.training:
-      x = self.stochastic_depth(x)
+    # if self.training:
+    #   x = self.stochastic_depth(x)
 
     # Residual connection
+    # print(x.shape)
+    # print(identity.shape)
     x = x + identity
     return x
        
