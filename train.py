@@ -74,7 +74,10 @@ def train(model, train_loader, val_loader):
   optimizer = AdamW(model.parameters(), lr=config["lr"], weight_decay=config["l2reg"])
 
   ################################
-  scheduler = #TODO
+  # scheduler = nn.ExponentialLR(optimizer, gamma=config["lr_decay"])
+  linScheduler = nn.LinearLR(optimizer, start_factor=.25, end_factor=1.0, last_epoch=20)
+  cosScheduler = nn.CosineAnnealingLR(optimizer, T_max=20) #20? feels like it could be inf
+
   ################################
   
 
@@ -89,6 +92,11 @@ def train(model, train_loader, val_loader):
     model.train()
 
     # Log LR
+    if epoch < 20:
+      scheduler = linScheduler
+    else:
+      scheduler = cosScheduler
+
     wandb.log({"LR/lr": scheduler.get_last_lr()[0]}, step=iteration)
 
     for x,y in train_loader:
@@ -127,6 +135,7 @@ def train(model, train_loader, val_loader):
     # Adjust LR
     scheduler.step()
 
+  torch.save(model.state_dict(), " chkpts/ " + run_name + " _epoch " + str(epoch))
   wandb.finish()
   pbar.close()
 
