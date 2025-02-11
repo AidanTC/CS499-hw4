@@ -76,7 +76,13 @@ def train(model, train_loader, val_loader):
   ################################
   # scheduler = nn.ExponentialLR(optimizer, gamma=config["lr_decay"])
   linScheduler = LinearLR(optimizer, start_factor=0.25, end_factor=1.0, total_iters=20)
-  cosScheduler = CosineAnnealingLR(optimizer, T_max=20) #20? feels like it could be inf
+  cosScheduler = CosineAnnealingLR(optimizer, T_max=config["max_epoch"] - 20) #20? feels like it could be inf
+
+  scheduler = SequentialLR(
+    optimizer,
+    schedulers=[linScheduler, cosScheduler],
+    milestones=[20]  # Switch to cosine decay after 20 epochs
+  )
 
   ################################
   
@@ -93,10 +99,10 @@ def train(model, train_loader, val_loader):
     model.train()
 
     # Log LR
-    if epoch < 20:
-      scheduler = linScheduler
-    else:
-      scheduler = cosScheduler
+    # if epoch < 20:
+    #   scheduler = linScheduler
+    # else:
+    #   scheduler = cosScheduler
 
     wandb.log({"LR/lr": scheduler.get_last_lr()[0]}, step=iteration)
 

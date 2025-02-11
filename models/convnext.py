@@ -12,7 +12,8 @@ class LayerNorm2d(nn.Module):
       self.layer_norm = torch.nn.LayerNorm(in_channels)
 
     def forward(self, x: Tensor) -> Tensor:
-      x = x.permute(0, 3, 1, 2)
+      x = x.permute(0, 2, 3, 1)
+      # x = x.permute(0, 3, 1, 2)
       x = self.layer_norm(x)
       x = x.permute(0, 3, 1, 2)
       return x
@@ -134,29 +135,34 @@ class ConvNext(nn.Module):
           nn.init.zeros_(module.bias)
 
 
-    self.modules()
-    w = torch.empty(3, 5)
-    nn.init.trunc_normal_(w)
     # how is out_channels used?
     self.stem = ConvNextStem(in_channels, 64)
-    self.res64 = ConvNextBlock(64)
+    self.res64_1 = ConvNextBlock(64)
+    self.res64_2 = ConvNextBlock(64)
     self.downsample128 = ConvNextDownsample(64, 128)
-    self.res128 = ConvNextBlock(128)
+    self.res128_1 = ConvNextBlock(128)
+    self.res128_2 = ConvNextBlock(128)
     self.downsample256 = ConvNextDownsample(128, 256)
-    self.res256 = ConvNextBlock(256)
+    self.res256_1 = ConvNextBlock(256)
+    self.res256_2 = ConvNextBlock(256)
     self.downsample512 = ConvNextDownsample(256, 512)
-    self.res512 = ConvNextBlock(512)
+    self.res512_1 = ConvNextBlock(512)
+    self.res512_2 = ConvNextBlock(512)
     self.classifier = ConvNextClassifier(512, out_channels)
 
 
   def forward(self,x):
     x = self.stem(x)
-    x = self.res64(x)
+    x = self.res64_1(x)
+    x = self.res64_2(x)
     x = self.downsample128(x)
-    x = self.res128(x)
+    x = self.res128_1(x)
+    x = self.res128_2(x)
     x = self.downsample256(x)
-    x = self.res256(x)
+    x = self.res256_1(x)
+    x = self.res256_2(x)
     x = self.downsample512(x)
-    x = self.res512(x)
+    x = self.res512_1(x)
+    x = self.res512_2(x)
     x = self.classifier(x)
     return x
