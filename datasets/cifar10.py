@@ -32,8 +32,8 @@ def getCIFAR10Dataloaders(config):
   test_set = datasets.CIFAR10(root='./datasets/data', train=False,download=True, transform=train_transform)
 
 
-  train_loader = DataLoader(train_set, shuffle=True, batch_size=config["bs"], num_workers=4, pin_memory=True)
-  val_loader = DataLoader(val_set, shuffle=False, batch_size=5*config["bs"], num_workers=4, pin_memory=True)
+  train_loader = DataLoader(train_set, shuffle=True, batch_size=config["bs"], num_workers=14, pin_memory=True)
+  val_loader = DataLoader(val_set, shuffle=False, batch_size=5*config["bs"], num_workers=14, pin_memory=True)
   test_loader = DataLoader(test_set,  shuffle=False, batch_size=config["bs"])
 
   return train_loader, val_loader, test_loader

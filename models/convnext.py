@@ -32,12 +32,11 @@ class ConvNextStem(nn.Module):
 class ConvNextBlock(nn.Module):
   def __init__(self, d_in, layer_scale=1e-6, kernel_size=7, stochastic_depth_prob=1):
     super().__init__()
-    # he initial layer scale (default 1e-6), and a stochastic depth probability of survival (default 1). 
     depthwise_multiplier = 1 #?
-    # depth_survival = 1
     
     self.depth_conv = nn.Conv2d(d_in, d_in*depthwise_multiplier, kernel_size=kernel_size, groups=d_in, padding=kernel_size // 2)
     self.layer_norm = LayerNorm2d(d_in)
+    self.gelu = nn.GELU()
     self.pointwise_conv = nn.Conv2d(in_channels=d_in, out_channels=d_in, kernel_size=1 )#bias=False 
 
     self.layer_scale = nn.Parameter(layer_scale * torch.ones(d_in))
@@ -49,6 +48,8 @@ class ConvNextBlock(nn.Module):
     identity = x
     x = self.depth_conv(x)
     x = self.layer_norm(x)
+
+    x = self.gelu(x)
     # print("after permute", x.shape)
 
     x = self.pointwise_conv(x)
@@ -91,14 +92,17 @@ class ConvNextClassifier(nn.Module):
   def __init__(self, d_in, d_out):
     # global average pooling, a standard layer norm, and a final linear layer to map to the number of classes.
     super().__init__()
-    self.global_avg_pool = nn.AdaptiveAvgPool2d(10)
+    self.global_avg_pool = nn.AdaptiveAvgPool2d((1,1))
     self.flatten = nn.Flatten()
     self.layer_norm = nn.LayerNorm(d_in)
     self.linear = nn.Linear(d_in, d_out)
 
   def forward(self,x):
+    # print(x.shape)
     x = self.global_avg_pool(x)
+    # print(x.shape)
     x = self.flatten(x)  #dont know if needed?
+    # print(x.shape)
     x = self.layer_norm(x)
     x = self.linear(x)
     return x
@@ -108,21 +112,22 @@ class ConvNext(nn.Module):
   def __init__(self, in_channels, out_channels, blocks=[96]):
     super().__init__()
 
-    for module in self.modules():
-      if isinstance(module, (nn.Conv2d, nn.Linear)):
-          # Initialize weights with truncated normal distribution
-          nn.init.trunc_normal_(module.weight, mean=0.0, std=0.02, a=-2.0, b=2.0)
-          # Initialize biases to 0
-          if module.bias is not None:
-            nn.init.zeros_(module.bias)
-      elif isinstance(module, nn.LayerNorm):
-          # Initialize LayerNorm weights (gamma) to 1
-          nn.init.ones_(module.weight)
-          # Initialize LayerNorm biases (beta) to 0
-          nn.init.zeros_(module.bias)
+    self.apply(self._init_weights)
 
 
-    # how is out_channels used?
+    # for module in self.modules():
+    #   if isinstance(module, (nn.Conv2d, nn.Linear)):
+    #       # Initialize weights with truncated normal distribution
+    #       nn.init.trunc_normal_(module.weight, mean=0.0, std=0.02, a=-2.0, b=2.0)
+    #       # Initialize biases to 0
+    #       if module.bias is not None:
+    #         nn.init.zeros_(module.bias)
+    #   elif isinstance(module, nn.LayerNorm):
+    #       # Initialize LayerNorm weights (gamma) to 1
+    #       nn.init.ones_(module.weight)
+    #       # Initialize LayerNorm biases (beta) to 0
+    #       nn.init.zeros_(module.bias)
+
     self.stem = ConvNextStem(in_channels, 64)
     self.res64_1 = ConvNextBlock(64)
     self.res64_2 = ConvNextBlock(64)
@@ -137,6 +142,15 @@ class ConvNext(nn.Module):
     self.res512_2 = ConvNextBlock(512)
     self.classifier = ConvNextClassifier(512, out_channels)
 
+  def _init_weights(self, module):
+    if isinstance(module, (nn.Conv2d, nn.Linear)):
+        # Initialize weights with truncated normal distribution
+        nn.init.trunc_normal_(module.weight, mean=0.0, std=0.02, a=-2.0, b=2.0)
+        if module.bias is not None:
+          nn.init.zeros_(module.bias)
+    elif isinstance(module, nn.LayerNorm):
+        nn.init.ones_(module.weight)
+        nn.init.zeros_(module.bias)
 
   def forward(self,x):
     x = self.stem(x)
