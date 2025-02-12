@@ -41,9 +41,11 @@ class ConvNextBlock(nn.Module):
     self.gelu = nn.GELU()
     self.pointwise_conv = nn.Conv2d(in_channels=d_in, out_channels=d_in, kernel_size=1 )#bias=False 
 
+    # could this be wrong?
     self.layer_scale = nn.Parameter(layer_scale * torch.ones(d_in), requires_grad=True)
 
     # could do if self.training, dont think i care
+    # check this?
     self.stochastic_depth_prob = stochastic_depth_prob
 
   def forward(self,x):
@@ -175,3 +177,9 @@ class ConvNext(nn.Module):
 
 
 #TO TRY stride =2 in stem
+
+
+
+
+
+#test acc should be around 80
