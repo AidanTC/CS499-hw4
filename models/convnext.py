@@ -20,8 +20,8 @@ class LayerNorm2d(nn.Module):
 class ConvNextStem(nn.Module):
    def __init__(self, in_channels, out_channels, kernel_size=3):
     super().__init__()
-    self.patchy_stem_conv = nn.Conv2d(in_channels, out_channels, kernel_size=kernel_size) #padding kernel?
-    # self.patchy_stem_conv = nn.Conv2d(in_channels, out_channels, kernel_size=kernel_size, stride=kernel_size) #padding kernel?
+    # self.patchy_stem_conv = nn.Conv2d(in_channels, out_channels, kernel_size=kernel_size) #wrong?
+    self.patchy_stem_conv = nn.Conv2d(in_channels, out_channels, kernel_size=kernel_size, stride=kernel_size) #padding kernel?
   
    def forward(self,x):
     x = self.patchy_stem_conv(x)
@@ -48,21 +48,15 @@ class ConvNextBlock(nn.Module):
   def forward(self,x):
     identity = x
     x = self.depth_conv(x)
-
-    # Permute for LayerNorm (B x C x H x W -> B x H x W x C)
-    # x = x.permute(0, 2, 3, 1)
     x = self.layer_norm(x)
-    # x = x.permute(0, 3, 1, 2)
     # print("after permute", x.shape)
 
-    # Pointwise convolution
     x = self.pointwise_conv(x)
 
     # Layer scaling
     x = x * self.layer_scale[None, :, None, None]
 
     if self.training:
-      # Stochastic depth
       mask = torch.rand(x.shape[0], 1, 1, 1, device=x.device) < self.stochastic_depth_prob
       x = x * mask / self.stochastic_depth_prob
 
@@ -72,11 +66,6 @@ class ConvNextBlock(nn.Module):
       # else:
       #   x = torch.zeros
 
-    # Stochastic depth
-    # if self.training:
-    #   x = self.stochastic_depth(x)
-
-    # Residual connection
     # print(x.shape)
     # print(identity.shape)
     x = x + identity
@@ -87,10 +76,12 @@ class ConvNextBlock(nn.Module):
 class ConvNextDownsample(nn.Module):
   def __init__(self, d_in, d_out, width=2):
     super().__init__()
+    self.layer_norm = LayerNorm2d(d_in)
     self.downsample = nn.Conv2d(d_in, d_out, kernel_size=width, stride=width)
 
 
   def forward(self,x):
+    x = self.layer_norm(x)
     x = self.downsample(x)
     return x
 
@@ -100,7 +91,7 @@ class ConvNextClassifier(nn.Module):
   def __init__(self, d_in, d_out):
     # global average pooling, a standard layer norm, and a final linear layer to map to the number of classes.
     super().__init__()
-    self.global_avg_pool = nn.AdaptiveAvgPool2d(1)
+    self.global_avg_pool = nn.AdaptiveAvgPool2d(10)
     self.flatten = nn.Flatten()
     self.layer_norm = nn.LayerNorm(d_in)
     self.linear = nn.Linear(d_in, d_out)
