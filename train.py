@@ -22,6 +22,7 @@ if use_cuda_if_avail and torch.cuda.is_available():
     print("Using GPU")
 else:
     device = "cpu"
+# 6.1 5 min, maybe slow data bus, may want to try moving things to a different drive
 
 config = {
     "bs":128,   # batch size
@@ -64,6 +65,7 @@ def train(model, train_loader, val_loader):
   run_name = generateRunName()
 
   # Startup wandb logging
+
   wandb.login()
   wandb.init(project="CIFAR10 CS499 A4", name=run_name, config=config)
 
@@ -76,12 +78,12 @@ def train(model, train_loader, val_loader):
   ################################
   # scheduler = nn.ExponentialLR(optimizer, gamma=config["lr_decay"])
   linScheduler = LinearLR(optimizer, start_factor=0.25, end_factor=1.0, total_iters=20)
-  cosScheduler = CosineAnnealingLR(optimizer, T_max=config["max_epoch"] - 20) #20? feels like it could be inf
+  cosScheduler = CosineAnnealingLR(optimizer, T_max=config["max_epoch"] - 20)
 
   scheduler = SequentialLR(
     optimizer,
     schedulers=[linScheduler, cosScheduler],
-    milestones=[20]  # Switch to cosine decay after 20 epochs
+    milestones=[20] 
   )
 
   ################################
@@ -95,6 +97,7 @@ def train(model, train_loader, val_loader):
   best_val = 0
   print("training started")
   pbar = tqdm(total=config["max_epoch"]*len(train_loader), desc="Training Iterations", unit="batch")
+
   for epoch in range(config["max_epoch"]):
     model.train()
 
@@ -142,7 +145,8 @@ def train(model, train_loader, val_loader):
     # Adjust LR
     scheduler.step()
 
-  torch.save(model.state_dict(), " chkpts/ " + run_name + " _epoch " + str(epoch))
+  torch.save(model.state_dict(), "chkpts/ " + run_name + " _epoch " + str(epoch))
+
   wandb.finish()
   pbar.close()
 

@@ -2,18 +2,17 @@ import torch
 from torch import Tensor
 import torch.nn as nn
 import torch.nn.functional as F
+import torchvision.ops.stochastic_depth as stochastic_depth
 
 
 class LayerNorm2d(nn.Module):
     def __init__(self, in_channels):
       super().__init__()
       # Input has shape B x C x H x W
-      # layer_norm = in_channels.permute(0, 3, 1, 2)
       self.layer_norm = torch.nn.LayerNorm(in_channels)
 
     def forward(self, x: Tensor) -> Tensor:
       x = x.permute(0, 2, 3, 1)
-      # x = x.permute(0, 3, 1, 2)
       x = self.layer_norm(x)
       x = x.permute(0, 3, 1, 2)
       return x
@@ -21,7 +20,8 @@ class LayerNorm2d(nn.Module):
 class ConvNextStem(nn.Module):
    def __init__(self, in_channels, out_channels, kernel_size=3):
     super().__init__()
-    self.patchy_stem_conv = nn.Conv2d(in_channels, out_channels, kernel_size=kernel_size, stride=kernel_size) #padding kernel?
+    self.patchy_stem_conv = nn.Conv2d(in_channels, out_channels, kernel_size=kernel_size) #padding kernel?
+    # self.patchy_stem_conv = nn.Conv2d(in_channels, out_channels, kernel_size=kernel_size, stride=kernel_size) #padding kernel?
   
    def forward(self,x):
     x = self.patchy_stem_conv(x)
@@ -33,32 +33,26 @@ class ConvNextBlock(nn.Module):
   def __init__(self, d_in, layer_scale=1e-6, kernel_size=7, stochastic_depth_prob=1):
     super().__init__()
     # he initial layer scale (default 1e-6), and a stochastic depth probability of survival (default 1). 
-    # layer_scale = .000001
     depthwise_multiplier = 1 #?
     # depth_survival = 1
     
     self.depth_conv = nn.Conv2d(d_in, d_in*depthwise_multiplier, kernel_size=kernel_size, groups=d_in, padding=kernel_size // 2)
-    self.layer_norm = nn.LayerNorm(d_in)
-    self.pointwise_conv = nn.Conv2d(in_channels= d_in, out_channels= d_in, kernel_size=1 )#bias=False 
+    self.layer_norm = LayerNorm2d(d_in)
+    self.pointwise_conv = nn.Conv2d(in_channels=d_in, out_channels=d_in, kernel_size=1 )#bias=False 
 
-    # Layer scale parameter (initialized with layer_scale_init)
     self.layer_scale = nn.Parameter(layer_scale * torch.ones(d_in))
 
     # could do if self.training, dont think i care
     self.stochastic_depth_prob = stochastic_depth_prob
 
   def forward(self,x):
-  # Save the input for the residual connection
     identity = x
-    
-
-    # Depthwise convolution
     x = self.depth_conv(x)
 
     # Permute for LayerNorm (B x C x H x W -> B x H x W x C)
-    x = x.permute(0, 2, 3, 1)
+    # x = x.permute(0, 2, 3, 1)
     x = self.layer_norm(x)
-    x = x.permute(0, 3, 1, 2)
+    # x = x.permute(0, 3, 1, 2)
     # print("after permute", x.shape)
 
     # Pointwise convolution
@@ -71,6 +65,8 @@ class ConvNextBlock(nn.Module):
       # Stochastic depth
       mask = torch.rand(x.shape[0], 1, 1, 1, device=x.device) < self.stochastic_depth_prob
       x = x * mask / self.stochastic_depth_prob
+
+      # x = stochastic_depth(x, self.stochastic_depth_prob, "row")
       # if torch.rand(1) < self.stochastic_depth_prob:
       #   x = x / self.stochastic_depth_prob
       # else:
