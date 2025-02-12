@@ -46,8 +46,8 @@ def main():
 
 
   # Start model training
-  if __name__ == "__main__":
-    train(model, train_loader, val_loader)
+  # return model, train_loader, val_loader
+  train(model, train_loader, val_loader)
 
 
 ############################################
@@ -203,4 +203,8 @@ def generatePredictionPlot(model, test_loader):
 
 
 if __name__ == "__main__":
+  import torch.multiprocessing
+  torch.multiprocessing.set_start_method('spawn', force=True)
+  # model, train_loader, val_loader = main()
+  # train(model, train_loader, val_loader)
   main()
