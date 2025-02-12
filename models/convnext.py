@@ -10,6 +10,8 @@ class LayerNorm2d(nn.Module):
       super().__init__()
       # Input has shape B x C x H x W
       self.layer_norm = torch.nn.LayerNorm(in_channels)
+      nn.init.ones_(self.layer_norm.weight)
+      nn.init.zeros_(self.layer_norm.bias)
 
     def forward(self, x: Tensor) -> Tensor:
       x = x.permute(0, 2, 3, 1)
@@ -21,8 +23,7 @@ class ConvNextStem(nn.Module):
    def __init__(self, in_channels, out_channels, kernel_size=3):
     super().__init__()
     # self.patchy_stem_conv = nn.Conv2d(in_channels, out_channels, kernel_size=kernel_size) #wrong?
-    self.patchy_stem_conv = nn.Conv2d(in_channels, out_channels, kernel_size=kernel_size, stride=kernel_size) #padding kernel?
-  
+    self.patchy_stem_conv = nn.Conv2d(in_channels, out_channels, kernel_size=kernel_size, stride=kernel_size) #TO TRY stride =2
    def forward(self,x):
     x = self.patchy_stem_conv(x)
     return x
@@ -32,14 +33,15 @@ class ConvNextStem(nn.Module):
 class ConvNextBlock(nn.Module):
   def __init__(self, d_in, layer_scale=1e-6, kernel_size=7, stochastic_depth_prob=1):
     super().__init__()
-    depthwise_multiplier = 1 #?
+    # depthwise_multiplier = 1 #?
     
-    self.depth_conv = nn.Conv2d(d_in, d_in*depthwise_multiplier, kernel_size=kernel_size, groups=d_in, padding=kernel_size // 2)
+    # self.depth_conv = nn.Conv2d(d_in, d_in*depthwise_multiplier, kernel_size=kernel_size, groups=d_in, padding=kernel_size // 2)
+    self.depth_conv = nn.Conv2d(d_in, d_in, kernel_size=kernel_size, groups=d_in, padding=kernel_size // 2)
     self.layer_norm = LayerNorm2d(d_in)
     self.gelu = nn.GELU()
     self.pointwise_conv = nn.Conv2d(in_channels=d_in, out_channels=d_in, kernel_size=1 )#bias=False 
 
-    self.layer_scale = nn.Parameter(layer_scale * torch.ones(d_in))
+    self.layer_scale = nn.Parameter(layer_scale * torch.ones(d_in), requires_grad=True)
 
     # could do if self.training, dont think i care
     self.stochastic_depth_prob = stochastic_depth_prob
@@ -48,24 +50,16 @@ class ConvNextBlock(nn.Module):
     identity = x
     x = self.depth_conv(x)
     x = self.layer_norm(x)
-
     x = self.gelu(x)
-    # print("after permute", x.shape)
-
     x = self.pointwise_conv(x)
 
     # Layer scaling
     x = x * self.layer_scale[None, :, None, None]
 
-    if self.training:
-      mask = torch.rand(x.shape[0], 1, 1, 1, device=x.device) < self.stochastic_depth_prob
-      x = x * mask / self.stochastic_depth_prob
-
-      # x = stochastic_depth(x, self.stochastic_depth_prob, "row")
-      # if torch.rand(1) < self.stochastic_depth_prob:
-      #   x = x / self.stochastic_depth_prob
-      # else:
-      #   x = torch.zeros
+    x = stochastic_depth(x, self.stochastic_depth_prob, "row", training=self.training)
+    # if self.training:
+      # mask = torch.rand(x.shape[0], 1, 1, 1, device=x.device) < self.stochastic_depth_prob
+      # x = x * mask / self.stochastic_depth_prob
 
     # print(x.shape)
     # print(identity.shape)
@@ -167,3 +161,17 @@ class ConvNext(nn.Module):
     x = self.res512_2(x)
     x = self.classifier(x)
     return x
+  
+
+# pink:
+  #added _init_weights
+  #add gelu to blocks
+
+#using stochastic_depth
+# init in layernorm2d
+# nn.init.ones_(self.layer_norm.weight)
+# nn.init.zeros_(self.layer_norm.bias)
+# commented out # depthwise_multiplier = 1 #?
+
+
+#TO TRY stride =2 in stem

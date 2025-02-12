@@ -46,7 +46,8 @@ def main():
 
 
   # Start model training
-  train(model, train_loader, val_loader)
+  if __name__ == "__main__":
+    train(model, train_loader, val_loader)
 
 
 ############################################
@@ -144,8 +145,8 @@ def train(model, train_loader, val_loader):
 
     # Adjust LR
     scheduler.step()
+    torch.save(model.state_dict(), "chkpts/" + run_name + "_epoch " + str(epoch))
 
-  torch.save(model.state_dict(), "chkpts/ " + run_name + " _epoch " + str(epoch))
 
   wandb.finish()
   pbar.close()
@@ -201,4 +202,5 @@ def generatePredictionPlot(model, test_loader):
   return f
 
 
-main()
+if __name__ == "__main__":
+  main()
