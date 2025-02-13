@@ -20,12 +20,12 @@ class LayerNorm2d(nn.Module):
       return x
 
 class ConvNextStem(nn.Module):
-   def __init__(self, in_channels, out_channels, kernel_size=3):
+  def __init__(self, in_channels, out_channels, kernel_size=3):
     super().__init__()
     # self.patchy_stem_conv = nn.Conv2d(in_channels, out_channels, kernel_size=kernel_size) #wrong?
-    self.patchy_stem_conv = nn.Conv2d(in_channels, out_channels, kernel_size=kernel_size, stride=kernel_size) #TO TRY stride =2
+    self.patchy_stem_conv = nn.Conv2d(in_channels, out_channels, kernel_size=kernel_size, stride=2) # stride=kernel_size
     self.layer_norm = LayerNorm2d(out_channels)
-   def forward(self,x):
+  def forward(self,x):
     x = self.patchy_stem_conv(x)
     x= self.layer_norm(x)
     return x
@@ -42,15 +42,13 @@ class ConvNextBlock(nn.Module):
     self.layer_norm = LayerNorm2d(d_in)
     self.conv2 = nn.Conv2d(d_in, d_in*4, kernel_size=1)
     self.gelu = nn.GELU()
-    self.conv3 = nn.Conv2d(d_in*4, d_in, kernel_size=1)
+    # self.conv3 = nn.Conv2d(d_in*4, d_in, kernel_size=1)
+    self.conv3 = nn.Conv2d(d_in*4, d_in*2, kernel_size=1)
+    self.gelu2 = nn.GELU()
+    self.conv4 = nn.Conv2d(d_in*2, d_in, kernel_size=1)
 
     # self.pointwise_conv = nn.Conv2d(in_channels=d_in, out_channels=d_in, kernel_size=1 )#bias=False 
-
-    # could this be wrong?
     self.layer_scale = nn.Parameter(layer_scale * torch.ones(d_in), requires_grad=True)
-
-    # could do if self.training, dont think i care
-    # check this?
     self.stochastic_depth_prob = stochastic_depth_prob
 
   def forward(self,x):
@@ -60,11 +58,13 @@ class ConvNextBlock(nn.Module):
     x = self.conv2(x)
     x = self.gelu(x)
     x = self.conv3(x)
-    # x = self.pointwise_conv(x)
+    x = self.gelu2(x)
+    x = self.conv4(x)
 
     # Layer scaling
     x = x * self.layer_scale[None, :, None, None]
 
+    # feel like this shgould work but it doesnt
     # x = stochastic_depth(x, self.stochastic_depth_prob, "row", training=self.training)
     if self.training:
       mask = torch.rand(x.shape[0], 1, 1, 1, device=x.device) < self.stochastic_depth_prob
@@ -82,7 +82,6 @@ class ConvNextDownsample(nn.Module):
     super().__init__()
     self.layer_norm = LayerNorm2d(d_in)
     self.downsample = nn.Conv2d(d_in, d_out, kernel_size=width, stride=width)
-
 
   def forward(self,x):
     x = self.layer_norm(x)
@@ -111,77 +110,30 @@ class ConvNextClassifier(nn.Module):
     return x
 
 
-# class ConvNext(nn.Module):
-#   def __init__(self, in_channels, out_channels, blocks=[96]):
-#     super().__init__()
-
-#     self.apply(self._init_weights)
-
-#     self.stem = ConvNextStem(in_channels, 64)
-#     self.res64_1 = ConvNextBlock(64)
-#     self.res64_2 = ConvNextBlock(64)
-#     self.downsample128 = ConvNextDownsample(64, 128)
-#     self.res128_1 = ConvNextBlock(128)
-#     self.res128_2 = ConvNextBlock(128)
-#     self.downsample256 = ConvNextDownsample(128, 256)
-#     self.res256_1 = ConvNextBlock(256)
-#     self.res256_2 = ConvNextBlock(256)
-#     self.downsample512 = ConvNextDownsample(256, 512)
-#     self.res512_1 = ConvNextBlock(512)
-#     self.res512_2 = ConvNextBlock(512)
-#     self.classifier = ConvNextClassifier(512, out_channels)
-
-#   def _init_weights(self, module):
-#     if isinstance(module, (nn.Conv2d, nn.Linear)):
-#         # Initialize weights with truncated normal distribution
-#         nn.init.trunc_normal_(module.weight, mean=0.0, std=0.02, a=-2.0, b=2.0)
-#         if module.bias is not None:
-#           nn.init.zeros_(module.bias)
-#     elif isinstance(module, nn.LayerNorm):
-#         nn.init.ones_(module.weight)
-#         nn.init.zeros_(module.bias)
-
-#   def forward(self,x):
-#     x = self.stem(x)
-#     x = self.res64_1(x)
-#     x = self.res64_2(x)
-#     x = self.downsample128(x)
-#     x = self.res128_1(x)
-#     x = self.res128_2(x)
-#     x = self.downsample256(x)
-#     x = self.res256_1(x)
-#     x = self.res256_2(x)
-#     x = self.downsample512(x)
-#     x = self.res512_1(x)
-#     x = self.res512_2(x)
-#     x = self.classifier(x)
-#     return x
-
-
 class ConvNext(nn.Module):
   def __init__(self, in_channels, out_channels, blocks=[96]):
     super().__init__()
     self.stem = ConvNextStem(in_channels, blocks[0])
 
     layers = []
-    residual = 1
-    channels = blocks[0]
+    resid = 1
+    currChannel = blocks[0]
 
-    for i in range(len(blocks)):
-      if blocks[i] != channels:
-        layers.append(ConvNextDownsample(channels, blocks[i]))
-        channels = blocks[i]
+    for i in range( len(blocks) ):
+      if blocks[i] != currChannel:
+        layers.append(ConvNextDownsample(currChannel, blocks[i]))
+        currChannel = blocks[i]
 
-      stochastic_depth = 1 - (residual / len(blocks)) * 0.5
-      residual += 1
+      stochastic_depth = 1-((resid / len(blocks)) * 0.5) 
+      resid += 1
       layers.append(ConvNextBlock(blocks[i], stochastic_depth_prob=stochastic_depth))
 
-    self.stages = nn.Sequential(*layers)
-    self.head = ConvNextClassifier(blocks[-1], out_channels)
+    self.body = nn.Sequential(*layers)
+    self.classifier = ConvNextClassifier(blocks[-1], out_channels)
 
     for module in self.modules():
       if isinstance(module, (nn.Conv2d, nn.Linear)):
-        nn.init.trunc_normal_(module.weight, 0, 0.02, -2, 2)
+        nn.init.trunc_normal_(module.weight, mean=0.0, std=0.02, a=-2.0, b=2.0)
         nn.init.zeros_(module.bias)
       
       if isinstance(module, nn.LayerNorm):
@@ -190,8 +142,8 @@ class ConvNext(nn.Module):
 
   def forward(self,x):
     x = self.stem(x)
-    x = self.stages(x)
-    x = self.head(x)
+    x = self.body(x)
+    x = self.classifier(x)
     return x
   
 

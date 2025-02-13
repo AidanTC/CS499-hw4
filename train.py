@@ -25,7 +25,7 @@ else:
 # 6.1 5 min, maybe slow data bus, may want to try moving things to a different drive
 
 config = {
-    "bs":128,   # batch size
+    "bs":256,   # batch size
     "lr":0.004, # learning rate
     "l2reg":0.0000001, # weight decay
     "max_epoch":200,
@@ -43,7 +43,6 @@ def main():
   print(model)
 
   torch.compile(model)
-
 
   # Start model training
   # return model, train_loader, val_loader
@@ -79,7 +78,7 @@ def train(model, train_loader, val_loader):
   ################################
   # scheduler = nn.ExponentialLR(optimizer, gamma=config["lr_decay"])
   linScheduler = LinearLR(optimizer, start_factor=0.25, end_factor=1.0, total_iters=20)
-  cosScheduler = CosineAnnealingLR(optimizer, T_max=config["max_epoch"] - 20)
+  cosScheduler = CosineAnnealingLR(optimizer, T_max=config["max_epoch"] - 20) #do i need a max_epoch?
 
   scheduler = SequentialLR(
     optimizer,
