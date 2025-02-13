@@ -19,7 +19,7 @@ from models.convnext import ConvNext
 use_cuda_if_avail = True
 if use_cuda_if_avail and torch.cuda.is_available():
     device = "cuda"
-    print("Using GPU")
+    # print("Using GPU")
 else:
     device = "cpu"
 # 6.1 5 min, maybe slow data bus, may want to try moving things to a different drive

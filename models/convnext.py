@@ -38,8 +38,11 @@ class ConvNextBlock(nn.Module):
     # self.depth_conv = nn.Conv2d(d_in, d_in*depthwise_multiplier, kernel_size=kernel_size, groups=d_in, padding=kernel_size // 2)
     self.depth_conv = nn.Conv2d(d_in, d_in, kernel_size=kernel_size, groups=d_in, padding=kernel_size // 2)
     self.layer_norm = LayerNorm2d(d_in)
+    self.conv2 = nn.Conv2d(d_in, d_in*4, kernel_size=1)
     self.gelu = nn.GELU()
-    self.pointwise_conv = nn.Conv2d(in_channels=d_in, out_channels=d_in, kernel_size=1 )#bias=False 
+    self.conv3 = nn.Conv2d(d_in*4, d_in, kernel_size=1)
+
+    # self.pointwise_conv = nn.Conv2d(in_channels=d_in, out_channels=d_in, kernel_size=1 )#bias=False 
 
     # could this be wrong?
     self.layer_scale = nn.Parameter(layer_scale * torch.ones(d_in), requires_grad=True)
@@ -52,16 +55,18 @@ class ConvNextBlock(nn.Module):
     identity = x
     x = self.depth_conv(x)
     x = self.layer_norm(x)
+    x = self.conv2(x)
     x = self.gelu(x)
-    x = self.pointwise_conv(x)
+    x = self.conv3(x)
+    # x = self.pointwise_conv(x)
 
     # Layer scaling
     x = x * self.layer_scale[None, :, None, None]
 
-    x = stochastic_depth(x, self.stochastic_depth_prob, "row", training=self.training)
-    # if self.training:
-      # mask = torch.rand(x.shape[0], 1, 1, 1, device=x.device) < self.stochastic_depth_prob
-      # x = x * mask / self.stochastic_depth_prob
+    # x = stochastic_depth(x, self.stochastic_depth_prob, "row", training=self.training)
+    if self.training:
+      mask = torch.rand(x.shape[0], 1, 1, 1, device=x.device) < self.stochastic_depth_prob
+      x = x * mask / self.stochastic_depth_prob
 
     # print(x.shape)
     # print(identity.shape)
@@ -169,11 +174,16 @@ class ConvNext(nn.Module):
   #added _init_weights
   #add gelu to blocks
 
+
+# VxmRmo_CIFAR10
 #using stochastic_depth
 # init in layernorm2d
 # nn.init.ones_(self.layer_norm.weight)
 # nn.init.zeros_(self.layer_norm.bias)
 # commented out # depthwise_multiplier = 1 #?
+
+# this sucked, trying changes with my stochastic depth
+# 
 
 
 #TO TRY stride =2 in stem
