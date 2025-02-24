@@ -2,4 +2,3 @@
 *.meta
 /wandb
 /datasets
-/chkpts
