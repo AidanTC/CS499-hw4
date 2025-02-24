@@ -38,5 +38,6 @@ This repository contains the code and documentation for Homework 4 of CS499 Intr
 
 ## Output
 Assuming everything runs correctly, in Wandb you will be able to see a number of output graphs, the Acc/Val graph should look close to this. 
+
 <img width="343" alt="Untitled" src="https://github.com/user-attachments/assets/c82070d6-a140-4491-b22d-d0458d2c0ce6" />
 
